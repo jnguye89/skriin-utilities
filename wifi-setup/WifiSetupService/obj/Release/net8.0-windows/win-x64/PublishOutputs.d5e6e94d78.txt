@@ -1,0 +1,10 @@
+/Users/jnguye89/Development/streamline/wifi-setup/WifiSetupService/publish/win-x64/appsettings.Development.json
+/Users/jnguye89/Development/streamline/wifi-setup/WifiSetupService/publish/win-x64/appsettings.json
+/Users/jnguye89/Development/streamline/wifi-setup/WifiSetupService/publish/win-x64/publish/win-x64/appsettings.Development.json
+/Users/jnguye89/Development/streamline/wifi-setup/WifiSetupService/publish/win-x64/publish/win-x64/appsettings.json
+/Users/jnguye89/Development/streamline/wifi-setup/WifiSetupService/publish/win-x64/publish/win-x64/publish/win-x64/appsettings.Development.json
+/Users/jnguye89/Development/streamline/wifi-setup/WifiSetupService/publish/win-x64/publish/win-x64/publish/win-x64/appsettings.json
+/Users/jnguye89/Development/streamline/wifi-setup/WifiSetupService/publish/win-x64/publish/win-x64/publish/win-x64/publish/win-x64/appsettings.Development.json
+/Users/jnguye89/Development/streamline/wifi-setup/WifiSetupService/publish/win-x64/publish/win-x64/publish/win-x64/publish/win-x64/appsettings.json
+/Users/jnguye89/Development/streamline/wifi-setup/WifiSetupService/publish/win-x64/WifiSetupService.pdb
+/Users/jnguye89/Development/streamline/wifi-setup/WifiSetupService/publish/win-x64/WifiSetupService.exe

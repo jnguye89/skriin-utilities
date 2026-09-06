@@ -1,0 +1,13 @@
+{
+  "KioskUrl": "http://127.0.0.1:5757/",
+  "DisplayName": "Skriin AI TV",
+  "CameraSiteUrl": "https://skriin.com/",
+  "BreakoutSequence": "Ctrl+Alt+Shift+S",
+  "OwnerAdminUserName": "skriinadmin",
+  "OwnerAdminFullName": "Skriin Admin",
+  "OwnerAdminLogonWorkflow": "ShowAdminTile",
+  "OwnerAdminPasswordPlainText": "REPLACE_WITH_STRONG_PASSWORD",
+  "LogonBackgroundImagePath": ".\\logon-background.png",
+  "ConfigureScancodeHardening": true,
+  "RebootAfterApply": true
+}
