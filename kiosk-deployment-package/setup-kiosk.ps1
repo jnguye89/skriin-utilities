@@ -34,6 +34,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Fail fast before changing anything: the Assigned Access step at the end of
+# this script needs LocalSystem (see invoke-technician-onetouch.ps1, which
+# relaunches itself as SYSTEM automatically). Running this as a normal
+# Administrator used to apply every other setting and then die on the very
+# last step, leaving the device on its previous kiosk URL.
+if (-not [System.Security.Principal.WindowsIdentity]::GetCurrent().IsSystem) {
+  throw "setup-kiosk.ps1 must run as SYSTEM (the MDM_AssignedAccess WMI provider only exposes 'Configuration' to LocalSystem). Run invoke-technician-onetouch.ps1 instead - it relaunches itself as SYSTEM."
+}
+
 function Ensure-RegistryKey {
   param(
     [Parameter(Mandatory = $true)][string]$Path
@@ -416,23 +425,20 @@ Set-ItemProperty -Path $edgePolicy -Name "PasswordManagerEnabled" -Type DWord -V
 # Reduce Edge update interruption UX. Updates should be handled by maintenance windows.
 Set-ItemProperty -Path $edgePolicy -Name "RelaunchNotification" -Type DWord -Value 0
 
-# Pre-authorize camera/microphone for the Skriin site (and the local
-# WifiSetupService launcher - its QR-scan screen needs the camera too) so
-# it works in the kiosk. Edge's --kiosk mode runs as an InPrivate-style
-# session (see Microsoft's own kiosk-mode docs) that never persists a
-# granted site permission, and there is no window chrome in a locked
-# single-app kiosk for anyone to click "Allow" on a media prompt anyway -
-# so without this, getUserMedia() calls just silently fail every time the
-# kiosk (re)starts, even though the exact same page works fine in a normal
-# (non-kiosk) Edge profile where a permission was granted and persisted once.
-Write-Host "Pre-authorizing camera/microphone for $CameraSiteUrl and $KioskUrl..."
+# Pre-authorize camera/microphone for the Skriin site so it works in the
+# kiosk. Edge's --kiosk mode runs as an InPrivate-style session (see
+# Microsoft's own kiosk-mode docs) that never persists a granted site
+# permission, and there is no window chrome in a locked single-app kiosk
+# for anyone to click "Allow" on a media prompt anyway - so without this,
+# getUserMedia() calls just silently fail every time the kiosk (re)starts,
+# even though the exact same site works fine in a normal (non-kiosk) Edge
+# profile where a permission was granted and persisted once.
+Write-Host "Pre-authorizing camera/microphone for $CameraSiteUrl..."
 $cameraSiteUri = [Uri]$CameraSiteUrl
-$kioskUri = [Uri]$KioskUrl
 $sitePatterns = @(
   "$($cameraSiteUri.Scheme)://$($cameraSiteUri.Host)/",
-  "$($cameraSiteUri.Scheme)://[*.]$($cameraSiteUri.Host)/",
-  "$($kioskUri.Scheme)://$($kioskUri.Host):$($kioskUri.Port)/"
-) | Select-Object -Unique
+  "$($cameraSiteUri.Scheme)://[*.]$($cameraSiteUri.Host)/"
+)
 
 $videoCaptureKey = "$edgePolicy\VideoCaptureAllowedUrls"
 $audioCaptureKey = "$edgePolicy\AudioCaptureAllowedUrls"

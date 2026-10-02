@@ -61,6 +61,69 @@ if ($null -ne $config.ActivationCsvPath -and -not [string]::IsNullOrWhiteSpace($
 }
 
 
+# Assigned Access is applied through the MDM Bridge WMI provider
+# (root\cimv2\mdm\dmmap / MDM_AssignedAccess), which only exposes its
+# writable 'Configuration' property to LocalSystem. Run as a normal elevated
+# Administrator, Get-CimInstance silently returns an object without that
+# property and setup-kiosk.ps1 dies at the very end with "The property
+# 'Configuration' cannot be found on this object" - after every other
+# setting has been applied, but before Edge's kiosk URL is updated. The
+# device then keeps booting into whatever Assigned Access config it had
+# before. So when not already SYSTEM, re-run this same script as SYSTEM via
+# a one-time scheduled task and relay its result.
+$currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+if (-not $currentIdentity.IsSystem) {
+  Write-Host "Assigned Access must be applied as SYSTEM - relaunching this workflow as SYSTEM via a one-time scheduled task..."
+
+  $taskName = "SkriinKioskOneTouch-" + [guid]::NewGuid().ToString("N").Substring(0, 8)
+  $scriptPath = $MyInvocation.MyCommand.Path
+  $taskArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -ConfigPath `"$ConfigPath`""
+  if ($AllowRdpSession.IsPresent) { $taskArgs += " -AllowRdpSession" }
+
+  $logDirForTask = Join-Path -Path $repoRoot -ChildPath "logs"
+  New-Item -Path $logDirForTask -ItemType Directory -Force | Out-Null
+  $existingLogs = @(Get-ChildItem -Path $logDirForTask -Filter "technician-run-*.log" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+
+  $action    = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $taskArgs -WorkingDirectory $repoRoot
+  $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+  $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
+  Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Settings $settings -Force | Out-Null
+
+  if ($config.RebootAfterApply) {
+    Write-Host "Note: RebootAfterApply is enabled - if setup succeeds the device will reboot on its own shortly."
+  }
+
+  try {
+    Start-ScheduledTask -TaskName $taskName
+    $deadline = (Get-Date).AddMinutes(30)
+    Start-Sleep -Seconds 2
+    while ((Get-ScheduledTask -TaskName $taskName).State -eq "Running" -and (Get-Date) -lt $deadline) {
+      Start-Sleep -Seconds 2
+    }
+    $taskResult = (Get-ScheduledTaskInfo -TaskName $taskName).LastTaskResult
+  }
+  finally {
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+  }
+
+  $newLog = Get-ChildItem -Path $logDirForTask -Filter "technician-run-*.log" -ErrorAction SilentlyContinue |
+    Where-Object { $existingLogs -notcontains $_.FullName } |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if ($null -ne $newLog) {
+    Write-Host ""
+    Write-Host "----- SYSTEM run log: $($newLog.FullName) -----"
+    Get-Content -Path $newLog.FullName | Write-Host
+    Write-Host "----- end of SYSTEM run log -----"
+  }
+
+  if ($taskResult -ne 0) {
+    throw "SYSTEM run of the one-touch workflow failed (exit code $taskResult). See the log above."
+  }
+  Write-Host "One-touch workflow completed successfully (ran as SYSTEM)."
+  return
+}
+
+
 $logDir = Join-Path -Path $repoRoot -ChildPath "logs"
 New-Item -Path $logDir -ItemType Directory -Force | Out-Null
 
