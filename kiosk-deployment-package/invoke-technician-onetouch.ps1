@@ -61,6 +61,49 @@ if ($null -ne $config.ActivationCsvPath -and -not [string]::IsNullOrWhiteSpace($
 }
 
 
+# Wi-Fi setup service (SkriinWifiSetup). Assigned Access points Edge at
+# KioskUrl, which is served locally by this service on http://127.0.0.1:5757/.
+# If the service isn't installed and running, the kiosk boots into Edge's
+# offline error instead of the on-screen Wi-Fi picker. So by default the
+# one-touch workflow installs/updates it itself, from the prebuilt publish
+# output in the sibling wifi-setup folder. Set "InstallWifiSetup": false only
+# when the service is already baked into the reference image.
+$installWifiSetup = $true
+if ($null -ne $config.InstallWifiSetup) {
+  $installWifiSetup = [bool]$config.InstallWifiSetup
+}
+
+$wifiSetupRoot = $null
+if ($installWifiSetup) {
+  $wifiSetupCandidate = if ($null -ne $config.WifiSetupPath -and -not [string]::IsNullOrWhiteSpace($config.WifiSetupPath)) { [string]$config.WifiSetupPath } else { "..\wifi-setup" }
+  if (-not [System.IO.Path]::IsPathRooted($wifiSetupCandidate)) {
+    $wifiSetupCandidate = Join-Path -Path $repoRoot -ChildPath $wifiSetupCandidate
+  }
+  if (-not (Test-Path -Path $wifiSetupCandidate)) {
+    throw "Wi-Fi setup folder not found: $wifiSetupCandidate. Set WifiSetupPath in the config, or set InstallWifiSetup to false if the service is already installed."
+  }
+  $wifiSetupRoot = (Resolve-Path -Path $wifiSetupCandidate -ErrorAction Stop).ProviderPath
+
+  $wifiInstallScript = Join-Path -Path $wifiSetupRoot -ChildPath "install.ps1"
+  if (-not (Test-Path -Path $wifiInstallScript)) {
+    throw "Wi-Fi setup installer not found: $wifiInstallScript"
+  }
+
+  $wifiPublishedExe = Join-Path -Path $wifiSetupRoot -ChildPath "WifiSetupService\publish\win-x64\WifiSetupService.exe"
+  if (-not (Test-Path -Path $wifiPublishedExe)) {
+    throw "Wi-Fi setup service has not been built: $wifiPublishedExe is missing. Run wifi-setup\build.ps1 on a machine with the .NET 8 SDK and copy the folder over, then re-run this script."
+  }
+  Write-Host "Wi-Fi setup service will be installed from: $wifiSetupRoot"
+}
+else {
+  Write-Host "InstallWifiSetup is false - leaving the SkriinWifiSetup service as-is."
+  $kioskUri = [Uri][string]$config.KioskUrl
+  if ($kioskUri.IsLoopback -and -not (Get-Service -Name "SkriinWifiSetup" -ErrorAction SilentlyContinue)) {
+    throw "KioskUrl points at the local Wi-Fi setup service ($($config.KioskUrl)), but the SkriinWifiSetup service is not installed and InstallWifiSetup is false. The kiosk would boot to a blank/offline page."
+  }
+}
+
+
 # Assigned Access is applied through the MDM Bridge WMI provider
 # (root\cimv2\mdm\dmmap / MDM_AssignedAccess), which only exposes its
 # writable 'Configuration' property to LocalSystem. Run as a normal elevated
@@ -165,6 +208,35 @@ try {
   }
   else {
     Write-Host "No activation workflow requested. Windows embedded-key or automatic activation is left unchanged."
+  }
+
+  if ($installWifiSetup) {
+    Write-Host "Installing Wi-Fi setup service (SkriinWifiSetup)..."
+    & $wifiInstallScript
+
+    $wifiService = Get-Service -Name "SkriinWifiSetup" -ErrorAction SilentlyContinue
+    if ($null -eq $wifiService -or $wifiService.Status -ne "Running") {
+      throw "SkriinWifiSetup service is not running after install. Check the output above."
+    }
+
+    # Make sure the picker actually answers on the kiosk URL before locking
+    # the device down to it.
+    $statusUrl = "http://127.0.0.1:5757/status"
+    $wifiResponding = $false
+    $statusDeadline = (Get-Date).AddSeconds(30)
+    while (-not $wifiResponding -and (Get-Date) -lt $statusDeadline) {
+      try {
+        $null = Invoke-WebRequest -Uri $statusUrl -UseBasicParsing -TimeoutSec 5
+        $wifiResponding = $true
+      }
+      catch {
+        Start-Sleep -Seconds 2
+      }
+    }
+    if (-not $wifiResponding) {
+      throw "SkriinWifiSetup is running but $statusUrl did not respond within 30 seconds."
+    }
+    Write-Host "[OK] Wi-Fi setup service is running and responding at $statusUrl"
   }
 
   $setupScript = Join-Path -Path $repoRoot -ChildPath "setup-kiosk.ps1"

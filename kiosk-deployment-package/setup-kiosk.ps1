@@ -440,8 +440,20 @@ $sitePatterns = @(
   "$($cameraSiteUri.Scheme)://[*.]$($cameraSiteUri.Host)/"
 )
 
+# The Wi-Fi picker's "Scan QR Code" path runs getUserMedia() on the local
+# KioskUrl page (http://127.0.0.1:5757/), a different origin from the real
+# site, so it needs its own entry or the scanner hits the same "no signal"
+# problem. Origin includes the port.
+$kioskUri = [Uri]$KioskUrl
+if ($kioskUri.Host -ne $cameraSiteUri.Host) {
+  $sitePatterns += $kioskUri.GetLeftPart([System.UriPartial]::Authority) + "/"
+}
+
 $videoCaptureKey = "$edgePolicy\VideoCaptureAllowedUrls"
 $audioCaptureKey = "$edgePolicy\AudioCaptureAllowedUrls"
+# Start from a clean list so entries from an earlier run don't linger.
+Remove-Item -Path $videoCaptureKey -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $audioCaptureKey -Recurse -Force -ErrorAction SilentlyContinue
 Ensure-RegistryKey -Path $videoCaptureKey
 Ensure-RegistryKey -Path $audioCaptureKey
 
@@ -450,7 +462,7 @@ for ($i = 0; $i -lt $sitePatterns.Count; $i++) {
   Set-ItemProperty -Path $videoCaptureKey -Name "$index" -Type String -Value $sitePatterns[$i]
   Set-ItemProperty -Path $audioCaptureKey -Name "$index" -Type String -Value $sitePatterns[$i]
 }
-Write-Host "[OK] Camera/microphone pre-authorized for $($cameraSiteUri.Host)"
+Write-Host "[OK] Camera/microphone pre-authorized for: $($sitePatterns -join ', ')"
 
 # Block common Windows interruption surfaces.
 Write-Host "Disabling common notification and interruption surfaces..."
@@ -510,6 +522,13 @@ Write-Host "Applying Assigned Access XML through MDM Bridge WMI..."
 $profileId = [guid]::NewGuid().ToString("B").ToUpperInvariant()
 $edgeArguments = "--kiosk $KioskUrl --edge-kiosk-type=fullscreen --no-first-run --kiosk-idle-timeout-minutes=0"
 
+# Escape everything inserted into XML attributes (an "&" in a URL or display
+# name would otherwise make the XML invalid).
+$xmlDisplayName = [System.Security.SecurityElement]::Escape($DisplayName)
+$xmlEdgePath = [System.Security.SecurityElement]::Escape($edgePath)
+$xmlEdgeArguments = [System.Security.SecurityElement]::Escape($edgeArguments)
+$xmlBreakout = [System.Security.SecurityElement]::Escape($BreakoutSequence)
+
 $assignedAccessXml = @"
 <?xml version="1.0" encoding="utf-8"?>
 <AssignedAccessConfiguration
@@ -518,16 +537,16 @@ $assignedAccessXml = @"
   xmlns:v4="http://schemas.microsoft.com/AssignedAccess/2021/config"
   xmlns:v5="http://schemas.microsoft.com/AssignedAccess/2022/config">
   <Profiles>
-    <Profile Id="$profileId" Name="$DisplayName">
+    <Profile Id="$profileId" Name="$xmlDisplayName">
       <KioskModeApp
-        v4:ClassicAppPath="$edgePath"
-        v4:ClassicAppArguments="$edgeArguments" />
-      <v4:BreakoutSequence Key="$BreakoutSequence" />
+        v4:ClassicAppPath="$xmlEdgePath"
+        v4:ClassicAppArguments="$xmlEdgeArguments" />
+      <v4:BreakoutSequence Key="$xmlBreakout" />
     </Profile>
   </Profiles>
   <Configs>
     <Config>
-      <AutoLogonAccount rs5:DisplayName="$DisplayName" />
+      <AutoLogonAccount rs5:DisplayName="$xmlDisplayName" />
       <DefaultProfile Id="$profileId" />
     </Config>
   </Configs>
@@ -538,12 +557,82 @@ New-Item -Path $artifactDir -ItemType Directory -Force | Out-Null
 $xmlPath = Join-Path -Path $artifactDir -ChildPath "assigned-access.xml"
 $assignedAccessXml | Set-Content -Path $xmlPath -Encoding UTF8
 
+# Catch malformed XML here with a readable error, before Windows rejects it
+# with a generic one.
+try {
+  [xml]$assignedAccessXml | Out-Null
+}
+catch {
+  throw "Generated Assigned Access XML is not well-formed ($xmlPath): $($_.Exception.Message)"
+}
+
 $namespaceName = "root\cimv2\mdm\dmmap"
 $className = "MDM_AssignedAccess"
-$assignedAccess = Get-CimInstance -Namespace $namespaceName -ClassName $className -ErrorAction Stop
 
-$assignedAccess.Configuration = [System.Net.WebUtility]::HtmlEncode($assignedAccessXml)
-Set-CimInstance -CimInstance $assignedAccess | Out-Null
+# The MDM Bridge only reports "A general error occurred" when it rejects a
+# config. The actual reason is written to these event logs, so dump them
+# whenever an apply fails.
+function Write-AssignedAccessDiagnostics {
+  param([datetime]$Since)
+
+  $logNames = @(
+    "Microsoft-Windows-AssignedAccess/Admin",
+    "Microsoft-Windows-AssignedAccess/Operational",
+    "Microsoft-Windows-AssignedAccessBroker/Admin",
+    "Microsoft-Windows-AssignedAccessBroker/Operational",
+    "Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin"
+  )
+  Write-Host "----- Assigned Access diagnostics (events since $Since) -----"
+  foreach ($logName in $logNames) {
+    try {
+      $events = @(Get-WinEvent -FilterHashtable @{ LogName = $logName; StartTime = $Since } -ErrorAction Stop |
+        Where-Object { $_.Level -le 3 } | Select-Object -First 15)
+    }
+    catch {
+      continue
+    }
+    foreach ($evt in $events) {
+      Write-Host "[$logName] $($evt.TimeCreated) id=$($evt.Id) $($evt.LevelDisplayName): $($evt.Message)"
+    }
+  }
+  Write-Host "Signed-in sessions:"
+  try { (quser.exe 2>&1) | ForEach-Object { Write-Host "  $_" } } catch { }
+  Write-Host "----- end of Assigned Access diagnostics -----"
+}
+
+function Set-AssignedAccessConfiguration {
+  param([AllowNull()][string]$Value)
+  $instance = Get-CimInstance -Namespace $namespaceName -ClassName $className -ErrorAction Stop
+  $instance.Configuration = $Value
+  Set-CimInstance -CimInstance $instance -ErrorAction Stop | Out-Null
+}
+
+$encodedAssignedAccessXml = [System.Net.WebUtility]::HtmlEncode($assignedAccessXml)
+$applyStart = Get-Date
+try {
+  Set-AssignedAccessConfiguration -Value $encodedAssignedAccessXml
+}
+catch {
+  $firstError = $_.Exception.Message
+  Write-Warning "Applying Assigned Access failed: $firstError"
+  Write-AssignedAccessDiagnostics -Since $applyStart.AddMinutes(-1)
+
+  # Replacing an existing Assigned Access config in place is the most common
+  # trigger for this. Clear it, give Windows a moment to tear the old kiosk
+  # profile down, then apply again.
+  Write-Host "Clearing the existing Assigned Access configuration and retrying once..."
+  $retryStart = Get-Date
+  try {
+    Set-AssignedAccessConfiguration -Value $null
+    Start-Sleep -Seconds 10
+    Set-AssignedAccessConfiguration -Value $encodedAssignedAccessXml
+    Write-Host "[OK] Assigned Access applied after clearing the previous configuration."
+  }
+  catch {
+    Write-AssignedAccessDiagnostics -Since $retryStart.AddMinutes(-1)
+    throw "Applying Assigned Access failed twice. First error: $firstError. Retry error: $($_.Exception.Message). See the diagnostics above and the XML at $xmlPath. Note: the previous Assigned Access configuration may now be cleared; re-run this workflow once the cause is fixed."
+  }
+}
 
 $postAssignedAccessUsers = @(Get-EnabledLocalUsers)
 $kioskUserName = Resolve-AssignedAccessKioskUserName -PreAssignedAccessUsers $preAssignedAccessUsers -PostAssignedAccessUsers $postAssignedAccessUsers -PersistPath $kioskUserPersistPath

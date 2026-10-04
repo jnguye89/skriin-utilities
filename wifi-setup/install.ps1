@@ -18,22 +18,34 @@ $DataDir      = "C:\ProgramData\Skriin"
 
 Write-Host "=== Skriin WiFi Setup Installer ===" -ForegroundColor Cyan
 
+# Check the build output exists before touching the installed service.
+$src = Join-Path $PSScriptRoot "WifiSetupService\publish\win-x64"
+if (-not (Test-Path $src)) {
+    # throw (not exit) so a calling script such as
+    # invoke-technician-onetouch.ps1 stops instead of carrying on.
+    throw "Build output not found at $src. Run build.ps1 first (dotnet publish WifiSetupService -c Release -r win-x64 --self-contained)."
+}
+
 # -- 1. Create directories -------------------------------------------------
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 New-Item -ItemType Directory -Force -Path $DataDir    | Out-Null
 Write-Host "[OK] Directories created"
 
-# -- 2. Copy files ---------------------------------------------------------
-$src = Join-Path $PSScriptRoot "WifiSetupService\publish\win-x64"
-if (-not (Test-Path $src)) {
-    Write-Host "Build output not found at $src" -ForegroundColor Red
-    Write-Host "Run first:  dotnet publish WifiSetupService -c Release -r win-x64 --self-contained"
-    exit 1
+# -- 2. Remove existing service if present ---------------------------------
+# Done before copying: a running service holds WifiSetupService.exe open,
+# so a re-install would otherwise fail to overwrite it.
+if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
+    Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+    sc.exe delete $ServiceName | Out-Null
+    Start-Sleep -Seconds 2
+    Write-Host "[OK] Old service removed"
 }
+
+# -- 3. Copy files ---------------------------------------------------------
 Copy-Item "$src\*" $InstallDir -Recurse -Force
 Write-Host "[OK] Files copied to $InstallDir"
 
-# -- 3. Enable Location Services system-wide --------------------------------
+# -- 4. Enable Location Services system-wide --------------------------------
 # netsh wlan (used internally by WifiHelper to read back SSID/state after
 # joining a network) refuses to return WLAN interface info at all -
 # "Access is denied" (error 5) - unless Location Services is turned on.
@@ -60,14 +72,6 @@ Set-ItemProperty -Path $masterSwitchKey -Name "Status" -Type DWord -Value 1
 Set-Service -Name lfsvc -StartupType Automatic -ErrorAction SilentlyContinue
 Start-Service -Name lfsvc -ErrorAction SilentlyContinue
 Write-Host "[OK] Location Services enabled (required for netsh wlan)"
-
-# -- 4. Remove existing service if present ---------------------------------
-if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
-    Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-    sc.exe delete $ServiceName | Out-Null
-    Start-Sleep -Seconds 2
-    Write-Host "[OK] Old service removed"
-}
 
 # -- 5. Register the service -----------------------------------------------
 $exePath = Join-Path $InstallDir $ExeName

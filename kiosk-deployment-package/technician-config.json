@@ -2,6 +2,8 @@
   "KioskUrl": "http://127.0.0.1:5757/",
   "DisplayName": "Skriin AI TV",
   "CameraSiteUrl": "https://skriin.com/",
+  "InstallWifiSetup": true,
+  "WifiSetupPath": "..\\wifi-setup",
   "BreakoutSequence": "Ctrl+Alt+Shift+S",
   "OwnerAdminUserName": "skriinadmin",
   "OwnerAdminFullName": "Skriin Admin",
