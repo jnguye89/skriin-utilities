@@ -295,6 +295,24 @@ function Set-LogonBackgroundImage {
   Write-Host "Windows 11 Pro lock/logon image behavior must be verified on target hardware."
 }
 
+function Remove-LogonBackgroundImage {
+  # A custom lock screen image (LockScreenImage/NoChangingLockScreen) has
+  # been observed to interfere with Assigned Access's ability to run the
+  # kiosk app above the lock screen: the kiosk account autologs in, is
+  # immediately disconnected back to the sign-in screen, and Windows clears
+  # the Assigned Access configuration. So if LogonBackgroundImagePath is no
+  # longer supplied, actively remove any values a prior run left behind
+  # instead of leaving them in place.
+  $personalizationPolicy = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization"
+  Remove-ItemProperty -Path $personalizationPolicy -Name "LockScreenImage" -ErrorAction SilentlyContinue
+  Remove-ItemProperty -Path $personalizationPolicy -Name "NoChangingLockScreen" -ErrorAction SilentlyContinue
+
+  $personalizationCsp = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\PersonalizationCSP"
+  Remove-ItemProperty -Path $personalizationCsp -Name "LockScreenImagePath" -ErrorAction SilentlyContinue
+  Remove-ItemProperty -Path $personalizationCsp -Name "LockScreenImageUrl" -ErrorAction SilentlyContinue
+  Remove-ItemProperty -Path $personalizationCsp -Name "LockScreenImageStatus" -ErrorAction SilentlyContinue
+}
+
 function Ensure-OwnerAdminAccount {
   param(
     [Parameter(Mandatory = $true)][string]$UserName,
@@ -361,6 +379,37 @@ function Set-ScancodeHardening {
   Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layout" -Name "Scancode Map" -Type Binary -Value $scancodeMap
 }
 
+function Clear-DisconnectedSessions {
+  # The MDM Bridge rejects an Assigned Access apply with ErrorCode(0x80070020)
+  # ("file in use") when the kiosk account still has an open session from an
+  # earlier autologon. The breakout sequence (Ctrl+Alt+Shift+S) only switches
+  # to the sign-in screen - by Microsoft's own design it does not sign the
+  # kiosk account out - so that session is left running disconnected in the
+  # background indefinitely until something explicitly logs it off. Clear any
+  # disconnected session here (leaving the technician's own active console
+  # session alone) so every apply starts from a clean slate instead of
+  # depending on a lucky retry.
+  $sessions = @(quser.exe 2>$null | Select-Object -Skip 1 | ForEach-Object {
+      if ($_ -match '^\s*(?<user>\S+)\s+(?:(?<session>[A-Za-z]\S*)\s+)?(?<id>\d+)\s+(?<state>Disc|Active|Conn)\b') {
+        [pscustomobject]@{
+          UserName = $Matches.user
+          Id       = [int]$Matches.id
+          State    = $Matches.state
+        }
+      }
+    })
+
+  foreach ($session in ($sessions | Where-Object { $_.State -eq "Disc" })) {
+    Write-Host "Logging off disconnected session for '$($session.UserName)' (session $($session.Id)) before applying Assigned Access..."
+    try {
+      logoff.exe $session.Id 2>&1 | Out-Null
+    }
+    catch {
+      Write-Warning "Could not log off session $($session.Id) for '$($session.UserName)': $($_.Exception.Message)"
+    }
+  }
+}
+
 Write-Host "Configuring Windows 11 Assigned Access kiosk for: $KioskUrl"
 
 # Confirm Edge exists.
@@ -406,6 +455,9 @@ if (Test-Path -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization")
 
 if ($null -ne $resolvedLogonBackgroundImage) {
   Set-LogonBackgroundImage -SourcePath $resolvedLogonBackgroundImage -AssetDirectory $assetDir
+}
+else {
+  Remove-LogonBackgroundImage
 }
 
 # Disable screen saver for current user and default profile hive.
@@ -528,6 +580,8 @@ Set-OwnerAdminLogonWorkflowPolicy -SystemPolicyPath $systemPolicy -Workflow $Own
 
 # Assigned Access configuration.
 Write-Host "Applying Assigned Access XML through MDM Bridge WMI..."
+
+Clear-DisconnectedSessions
 
 $profileId = [guid]::NewGuid().ToString("B").ToUpperInvariant()
 $edgeArguments = "--kiosk $KioskUrl --edge-kiosk-type=fullscreen --no-first-run --kiosk-idle-timeout-minutes=0"

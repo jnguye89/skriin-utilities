@@ -9,7 +9,6 @@
   "OwnerAdminFullName": "Skriin Admin",
   "OwnerAdminLogonWorkflow": "ShowAdminTile",
   "OwnerAdminPasswordPlainText": "1XjafangX9",
-  "LogonBackgroundImagePath": ".\\logon-background.png",
   "ConfigureScancodeHardening": true,
   "RebootAfterApply": true
 }
