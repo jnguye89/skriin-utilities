@@ -441,6 +441,21 @@ powercfg /change hibernate-timeout-ac 0
 powercfg /change hibernate-timeout-dc 0
 powercfg /hibernate off
 
+# The timeouts above only stop the device from sleeping on its own due to
+# inactivity. They do nothing about a manual press of the physical power
+# button, which on most OEM hardware defaults to Sleep rather than Shut
+# down. Sleep+wake resumes the exact previous session instead of rebooting,
+# so Assigned Access autologon never runs and whatever was on screen before
+# (an admin session, a locked screen) just comes back. Force the power and
+# sleep buttons to perform a real shutdown instead, so every manual
+# power-cycle is a real boot that goes through autologon.
+Write-Host "Setting power/sleep button actions to Shut Down (so power-cycling always triggers a fresh autologon boot)..."
+powercfg /setacvalueindex SCHEME_CURRENT SUB_BUTTONS PBUTTONACTION 3
+powercfg /setdcvalueindex SCHEME_CURRENT SUB_BUTTONS PBUTTONACTION 3
+powercfg /setacvalueindex SCHEME_CURRENT SUB_BUTTONS SBUTTONACTION 3
+powercfg /setdcvalueindex SCHEME_CURRENT SUB_BUTTONS SBUTTONACTION 3
+powercfg /setactive SCHEME_CURRENT
+
 
 # Deliberately NOT setting the "Do not display the lock screen" policy
 # (NoLockScreen) here. That policy is documented to break Assigned Access's
