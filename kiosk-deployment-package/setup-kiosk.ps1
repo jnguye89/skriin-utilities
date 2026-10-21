@@ -392,7 +392,17 @@ powercfg /change hibernate-timeout-ac 0
 powercfg /change hibernate-timeout-dc 0
 powercfg /hibernate off
 
-Set-PolicyDword -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization" -Name "NoLockScreen" -Value 1
+
+# Deliberately NOT setting the "Do not display the lock screen" policy
+# (NoLockScreen) here. That policy is documented to break Assigned Access's
+# AutoLogonAccount autologon - the device lands on the account-tile sign-in
+# screen on every boot instead of silently signing in to the kiosk account.
+# It isn't needed anyway: Assigned Access's kiosk app already covers the
+# whole screen before anyone could see a lock screen. Remove any prior value
+# from an earlier run so already-deployed devices self-heal.
+if (Test-Path -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization") {
+  Remove-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Personalization" -Name "NoLockScreen" -ErrorAction SilentlyContinue
+}
 
 if ($null -ne $resolvedLogonBackgroundImage) {
   Set-LogonBackgroundImage -SourcePath $resolvedLogonBackgroundImage -AssetDirectory $assetDir
