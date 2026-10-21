@@ -1,0 +1,77 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20261020184549
+Username: WORKGROUP\SYSTEM
+RunAs User: WORKGROUP\SYSTEM
+Configuration Name: 
+Machine: DEMO-PC2 (Microsoft Windows NT 10.0.26200.0)
+Host Application: powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\skriin\skriin-utilities\kiosk-deployment-package\invoke-technician-onetouch.ps1 -ConfigPath C:\skriin\skriin-utilities\kiosk-deployment-package\technician-config.json
+Process ID: 860
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Starting one-touch technician workflow...
+No activation workflow requested. Windows embedded-key or automatic activation is left unchanged.
+Installing Wi-Fi setup service (SkriinWifiSetup)...
+=== Skriin WiFi Setup Installer ===
+[OK] Directories created
+[OK] Old service removed
+[OK] Files copied to C:\Program Files\Skriin\WifiSetup
+[OK] Location Services enabled (required for netsh wlan)
+[OK] Service registered: SkriinWifiSetup
+[OK] Service started
+
+Installation complete.
+The service now serves the kiosk launcher at http://127.0.0.1:5757/
+Point Edge --kiosk at that URL (see kiosk-deployment-package/technician-config.json).
+[OK] Wi-Fi setup service is running and responding at http://127.0.0.1:5757/status
+Applying kiosk configuration...
+Configuring Windows 11 Assigned Access kiosk for: http://127.0.0.1:5757/
+Disabling lock screen, sleep, hibernate, monitor timeout, and screen saver...
+
+
+
+
+
+
+
+Configured lock/logon background image: C:\KioskSetup\Assets\logon-background.png
+Windows 11 Pro lock/logon image behavior must be verified on target hardware.
+Applying Microsoft Edge policy defaults...
+Pre-authorizing camera/microphone for https://skriin.com/...
+[OK] Camera/microphone pre-authorized for: https://skriin.com/, https://[*.]skriin.com/, http://127.0.0.1:5757/
+Disabling common notification and interruption surfaces...
+Leaving Fast User Switching entry points available for owner breakout path...
+Configuring Windows Update to avoid automatic reboots...
+Applying best-effort quiet boot settings...
+Boot spinner/logo suppression is hardware and edition dependent on Windows 11 Pro.
+Updating password and display name for existing owner admin account 'skriinadmin'...
+Owner admin account 'skriinadmin' remains usable by typing credentials directly.
+Applying optional scancode hardening (Win/App keys)...
+Account picker policy backup already exists: C:\KioskSetup\account-picker-policy-backup.json
+Configuring owner admin logon workflow: show owner admin tile when Windows displays account tiles.
+Applying Assigned Access XML through MDM Bridge WMI...
+Using persisted Assigned Access kiosk account: kioskUser0
+Leaving local account visible on sign-in screen: kioskUser0
+Leaving local account visible on sign-in screen: skriinadmin
+
+Assigned Access kiosk configuration applied successfully.
+Saved XML: C:\KioskSetup\assigned-access.xml
+Kiosk URL: http://127.0.0.1:5757/
+Breakout sequence: Ctrl+Alt+Shift+S
+Update install window starts at local hour: 3
+Active Hours: 6:00 to 23:00
+
+Rebooting in 5 seconds...
+One-touch workflow completed successfully.
+Log saved to: C:\skriin\skriin-utilities\kiosk-deployment-package\logs\technician-run-20261020-184549.log
+**********************
+Windows PowerShell transcript end
+End time: 20261020184600
+**********************

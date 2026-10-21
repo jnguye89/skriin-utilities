@@ -1,0 +1,95 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20261020184246
+Username: WORKGROUP\SYSTEM
+RunAs User: WORKGROUP\SYSTEM
+Configuration Name: 
+Machine: DEMO-PC2 (Microsoft Windows NT 10.0.26200.0)
+Host Application: powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\skriin\skriin-utilities\kiosk-deployment-package\invoke-technician-onetouch.ps1 -ConfigPath C:\skriin\skriin-utilities\kiosk-deployment-package\technician-config.json
+Process ID: 12788
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Starting one-touch technician workflow...
+No activation workflow requested. Windows embedded-key or automatic activation is left unchanged.
+Installing Wi-Fi setup service (SkriinWifiSetup)...
+=== Skriin WiFi Setup Installer ===
+[OK] Directories created
+[OK] Old service removed
+[OK] Files copied to C:\Program Files\Skriin\WifiSetup
+[OK] Location Services enabled (required for netsh wlan)
+[OK] Service registered: SkriinWifiSetup
+[OK] Service started
+
+Installation complete.
+The service now serves the kiosk launcher at http://127.0.0.1:5757/
+Point Edge --kiosk at that URL (see kiosk-deployment-package/technician-config.json).
+[OK] Wi-Fi setup service is running and responding at http://127.0.0.1:5757/status
+Applying kiosk configuration...
+Configuring Windows 11 Assigned Access kiosk for: http://127.0.0.1:5757/
+Disabling lock screen, sleep, hibernate, monitor timeout, and screen saver...
+
+
+
+
+
+
+
+Configured lock/logon background image: C:\KioskSetup\Assets\logon-background.png
+Windows 11 Pro lock/logon image behavior must be verified on target hardware.
+Applying Microsoft Edge policy defaults...
+Pre-authorizing camera/microphone for https://skriin.com/...
+[OK] Camera/microphone pre-authorized for: https://skriin.com/, https://[*.]skriin.com/, http://127.0.0.1:5757/
+Disabling common notification and interruption surfaces...
+Leaving Fast User Switching entry points available for owner breakout path...
+Configuring Windows Update to avoid automatic reboots...
+Applying best-effort quiet boot settings...
+Boot spinner/logo suppression is hardware and edition dependent on Windows 11 Pro.
+Updating password and display name for existing owner admin account 'skriinadmin'...
+Owner admin account 'skriinadmin' remains usable by typing credentials directly.
+Applying optional scancode hardening (Win/App keys)...
+Account picker policy backup already exists: C:\KioskSetup\account-picker-policy-backup.json
+Configuring owner admin logon workflow: show owner admin tile when Windows displays account tiles.
+Applying Assigned Access XML through MDM Bridge WMI...
+PS>TerminatingError(Set-CimInstance): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: A general error occurred that is not covered by a more specific error code."
+>> TerminatingError(Set-CimInstance): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: A general error occurred that is not covered by a more specific error code."
+WARNING: Applying Assigned Access failed: A general error occurred that is not covered by a more specific error code.
+----- Assigned Access diagnostics (events since 10/20/2026 18:41:55) -----
+[Microsoft-Windows-AssignedAccess/Admin] 10/20/2026 18:42:55 id=32000 Error: AssignedAccess Configuration failed, ErrorCode(0x80070020)
+PS>TerminatingError(Get-WinEvent): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: No events were found that match the specified selection criteria."
+>> TerminatingError(Get-WinEvent): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: No events were found that match the specified selection criteria."
+>> TerminatingError(Get-WinEvent): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: No events were found that match the specified selection criteria."
+[Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin] 10/20/2026 18:42:55 id=404 Error: MDM ConfigurationManager: Command failure status. Configuration Source ID: (BAD10432-832B-4F94-9D0E-2BC0ED1E303B), Enrollment Name: (WMIBridge), Provider Name: (AssignedAccess), Command Type: (SetValue: from Replace), CSP URI: (./Device/Vendor/MSFT/AssignedAccess/Configuration), Result: (The process cannot access the file because it is being used by another process.).
+[Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin] 05/06/2028 09:42:57 id=844 Error: MDM PolicyManager: During Inbox found bad enrollment (82965F5A-6C65-4B7A-8075-488FCCE07D4E) during merge. Requesting merge (1e05dd5d-a022-46c5-963c-b20de341170f). Deleting policies for the enrollment. Enrollment state is (Your file waiting to be printed was deleted.).
+Signed-in sessions:
+   USERNAME              SESSIONNAME        ID  STATE   IDLE TIME  LOGON TIME
+   kioskuser0                                1  Disc           13  10/20/2026 5:56 PM
+   skriinadmin           console             3  Active         13  10/20/2026 6:29 PM
+----- end of Assigned Access diagnostics -----
+Clearing the existing Assigned Access configuration and retrying once...
+PS>TerminatingError(Set-CimInstance): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: A general error occurred that is not covered by a more specific error code."
+>> TerminatingError(Set-CimInstance): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: A general error occurred that is not covered by a more specific error code."
+----- Assigned Access diagnostics (events since 10/20/2026 18:41:56) -----
+[Microsoft-Windows-AssignedAccess/Admin] 10/20/2026 18:42:55 id=32000 Error: AssignedAccess Configuration failed, ErrorCode(0x80070020)
+PS>TerminatingError(Get-WinEvent): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: No events were found that match the specified selection criteria."
+>> TerminatingError(Get-WinEvent): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: No events were found that match the specified selection criteria."
+>> TerminatingError(Get-WinEvent): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: No events were found that match the specified selection criteria."
+[Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin] 10/20/2026 18:42:56 id=404 Error: MDM ConfigurationManager: Command failure status. Configuration Source ID: (BAD10432-832B-4F94-9D0E-2BC0ED1E303B), Enrollment Name: (WMIBridge), Provider Name: (AssignedAccess), Command Type: (SetValue: from Replace), CSP URI: (./Device/Vendor/MSFT/AssignedAccess/Configuration), Result: (Unknown Win32 Error code: 0xc00ce558).
+[Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin] 10/20/2026 18:42:55 id=404 Error: MDM ConfigurationManager: Command failure status. Configuration Source ID: (BAD10432-832B-4F94-9D0E-2BC0ED1E303B), Enrollment Name: (WMIBridge), Provider Name: (AssignedAccess), Command Type: (SetValue: from Replace), CSP URI: (./Device/Vendor/MSFT/AssignedAccess/Configuration), Result: (The process cannot access the file because it is being used by another process.).
+[Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin] 05/06/2028 09:42:57 id=844 Error: MDM PolicyManager: During Inbox found bad enrollment (82965F5A-6C65-4B7A-8075-488FCCE07D4E) during merge. Requesting merge (1e05dd5d-a022-46c5-963c-b20de341170f). Deleting policies for the enrollment. Enrollment state is (Your file waiting to be printed was deleted.).
+Signed-in sessions:
+   USERNAME              SESSIONNAME        ID  STATE   IDLE TIME  LOGON TIME
+   kioskuser0                                1  Disc           13  10/20/2026 5:56 PM
+   skriinadmin           console             3  Active         13  10/20/2026 6:29 PM
+----- end of Assigned Access diagnostics -----
+PS>TerminatingError(): "Applying Assigned Access failed twice. First error: A general error occurred that is not covered by a more specific error code.. Retry error: A general error occurred that is not covered by a more specific error code.. See the diagnostics above and the XML at C:\KioskSetup\assigned-access.xml. Note: the previous Assigned Access configuration may now be cleared; re-run this workflow once the cause is fixed."
+**********************
+Windows PowerShell transcript end
+End time: 20261020184256
+**********************
